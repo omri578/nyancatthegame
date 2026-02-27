@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nyan Cat The Game</title>
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden;background:#0b3d6e}
+    canvas{display:block}
+
+    #controls {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 10;
+}
+
+#btnUp, #btnDown {
+  width: 80px;
+  height: 80px;
+  font-size: 40px;
+  text-align: center;
+  line-height: 80px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25); /* שקוף */
+  color: white;
+  user-select: none;
+  touch-action: none;
+}
+
+#btnUp:active, #btnDown:active {
+  background: rgba(255,255,255,0.45);
+}
+  </style>
+</head>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b3d6e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-192.png">
+<body>
+<canvas id="c"></canvas>
+
+<div id="controls">
+  <div id="btnUp">▲</div>
+  <div id="btnDown">▼</div>
+</div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+}
+addEventListener("resize", resize);
+resize();
+
+// ======================
+// AUDIO (your exact rules)
+// ======================
+// Files next to index.html with EXACT names:
+const TRACK1_NAME = "Nyan Cat! [Official] 4.mp3";
+const TRACK2_NAME = "clideo_editor_fb67bf047b514be2a456fbc3d708d770.mp3";
+const CRASH_NAME  = "dragon-studio-car-crash-sound-effect-376874.mp3";
+
+const track1 = new Audio(encodeURI(TRACK1_NAME));
+const track2 = new Audio(encodeURI(TRACK2_NAME));
+const crash  = new Audio(encodeURI(CRASH_NAME));
+
+track1.loop = false;
+track2.loop = true;
+
+track1.volume = 0.35;
+track2.volume = 0.35;
+crash.volume  = 0.8;
+
+let musicMode = "none"; // none | track1 | track2
+let track1StartTimeMs = 0;
+
+function stopAllMusic(){
+  track1.pause();
+  track2.pause();
+}
+
+function startMusicSequence(){
+  // must be from user gesture
+  // on restart we ALWAYS restart from track1 (as you asked)
+  musicMode = "track1";
+
+  // reset
+  track2.pause(); track2.currentTime = 0;
+  track1.pause(); track1.currentTime = 0;
+
+  track1StartTimeMs = performance.now();
+  track1.play().catch(() => {
+    // if blocked, user can click again
+    musicMode = "none";
+  });
+}
+
+track1.addEventListener("ended", () => {
+  if(gameOver) return; // if dead, don't start track2
+  musicMode = "track2";
+  track2.currentTime = 0;
+  track2.play().catch(()=>{});
+});
+
+// ======================
+// INTRO TITLE (first 4 seconds)
+// ======================
+function introSeconds(){
+  if(musicMode !== "track1") return 999;
+  const t = (isFinite(track1.currentTime) && track1.currentTime > 0)
+    ? track1.currentTime
+    : (performance.now() - track1StartTimeMs)/1000;
+  return t;
+}
+function isIntroActive(){
+  return introSeconds() < 4;
+}
+function drawRetroTitle(){
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const text = "NYAN CAT THE GAME";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const cx = canvas.width/2;
+  const cy = canvas.height/2;
+
+  ctx.font = "bold 64px monospace";
+  ctx.fillStyle = "#000000";
+  ctx.fillText(text, cx+6, cy+6);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text, cx, cy);
+
+  ctx.font = "bold 22px monospace";
+  ctx.fillStyle = "#cfe8ff";
+  ctx.fillText("GET READY!", cx, cy + 70);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+}
+
+// ======================
+// STARS
+// ======================
+const stars = [];
+function resetStars(){
+  stars.length = 0;
+  for(let i=0;i<70;i++){
+    stars.push({
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height,
+      s: (Math.random()<0.7)?2:3,
+      t: (Math.random()*60)|0
+    });
+  }
+}
+resetStars();
+
+function drawStars(){
+  for(const st of stars){
+    st.x -= 1.2;
+    st.t = (st.t+1)%60;
+    if(st.x < -10){
+      st.x = canvas.width + Math.random()*60;
+      st.y = Math.random()*canvas.height;
+      st.s = (Math.random()<0.7)?2:3;
+      st.t = (Math.random()*60)|0;
+    }
+
+    const bright = st.t < 10 || (st.t>30 && st.t<35);
+    ctx.fillStyle = bright ? "#ffffff" : "#cfe8ff";
+
+    if(st.s===3){
+      ctx.fillRect(st.x, st.y, 3, 3);
+      ctx.fillRect(st.x-6, st.y, 3, 3);
+      ctx.fillRect(st.x+6, st.y, 3, 3);
+      ctx.fillRect(st.x, st.y-6, 3, 3);
+      ctx.fillRect(st.x, st.y+6, 3, 3);
+    } else {
+      ctx.fillRect(st.x, st.y, 3, 3);
+      ctx.fillRect(st.x+10, st.y+2, 3, 3);
+      ctx.fillRect(st.x+4, st.y+10, 3, 3);
+      ctx.fillRect(st.x-8, st.y+6, 3, 3);
+    }
+  }
+}
+
+// ======================
+// RAINBOW
+// ======================
+const rainbow = ["#ff0000","#ff9900","#ffff00","#00ff00","#0099ff","#9933ff"];
+function drawRainbowTrail(catX, catY, catW, catH){
+  const stripeH = Math.max(6, Math.floor(catH/6));
+  const tailLen = Math.min(520, canvas.width);
+  const wave = Math.sin(Date.now()/120) * 6;
+
+  for(let i=0;i<6;i++){
+    ctx.fillStyle = rainbow[i];
+    const y = catY + i*stripeH + wave;
+    for(let x=catX - tailLen; x<catX-10; x+=18){
+      const step = (Math.sin((x+Date.now()/50)/20)*4)|0;
+      ctx.fillRect(x, y+step, 18, stripeH);
+    }
+  }
+}
+
+// ======================
+// PIXEL CAT
+// ======================
+function px(x,y,w,h,color){
+  ctx.fillStyle = color;
+  ctx.fillRect(x,y,w,h);
+}
+function drawNyanCat(x,y,scale){
+  const p = scale;
+
+  const bw = 38*p, bh = 24*p;
+  px(x, y, bw, bh, "#000000");
+  px(x+2*p, y+2*p, (38-4)*p, (24-4)*p, "#f5c58a");
+  px(x+6*p, y+6*p, (38-12)*p, (24-12)*p, "#ff9bd6");
+
+  const spr = [
+    [10,10,"#ff3b7a"],[15,8,"#ff3b7a"],[22,12,"#ff3b7a"],
+    [18,16,"#ff3b7a"],[28,10,"#ff3b7a"],[12,16,"#ff3b7a"],
+    [24,18,"#ff3b7a"]
+  ];
+  for(const [sx,sy,c] of spr) px(x+sx*p, y+sy*p, 2*p, 2*p, c);
+
+  const hx = x + 30*p;
+  const hy = y + 10*p;
+  px(hx, hy, 18*p, 14*p, "#000000");
+  px(hx+2*p, hy+2*p, 14*p, 10*p, "#9a9a9a");
+
+  px(hx+2*p, hy-4*p, 6*p, 6*p, "#000000");
+  px(hx+10*p, hy-4*p, 6*p, 6*p, "#000000");
+  px(hx+3*p, hy-3*p, 4*p, 4*p, "#9a9a9a");
+  px(hx+11*p, hy-3*p, 4*p, 4*p, "#9a9a9a");
+
+  px(hx+5*p, hy+5*p, 2*p, 2*p, "#000000");
+  px(hx+11*p, hy+5*p, 2*p, 2*p, "#000000");
+  px(hx+7*p, hy+8*p, 6*p, 2*p, "#000000");
+
+  px(hx+3*p, hy+8*p, 2*p, 2*p, "#ff7fb3");
+  px(hx+13*p, hy+8*p, 2*p, 2*p, "#ff7fb3");
+
+  const ly = y + 22*p;
+  px(x+8*p,  ly, 4*p, 4*p, "#000000");
+  px(x+16*p, ly, 4*p, 4*p, "#000000");
+  px(x+24*p, ly, 4*p, 4*p, "#000000");
+  px(x+32*p, ly, 4*p, 4*p, "#000000");
+
+  px(x-6*p, y+14*p, 8*p, 4*p, "#000000");
+  px(x-4*p, y+16*p, 6*p, 2*p, "#9a9a9a");
+}
+
+// ======================
+// CONTROLS
+// ======================
+const keys = new Set();
+addEventListener("keydown", e=>{
+  if(["ArrowUp","ArrowDown","Enter"," "].includes(e.key)) e.preventDefault();
+  keys.add(e.key);
+});
+addEventListener("keyup", e=> keys.delete(e.key));
+
+let touchDir = 0;
+addEventListener("touchstart", e=>{
+  const t = e.touches[0];
+  touchDir = (t.clientY < innerHeight/2) ? -1 : 1;
+},{passive:true});
+addEventListener("touchend", ()=> touchDir = 0);
+
+// ======================
+// OBSTACLES + DIFFICULTY (slow ramp)
+// ======================
+let obstacles = [];
+let spawnTimer = 0;
+let difficultyMs = 0;
+
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+function difficultyT(){
+  // Hard only after a long time (2 minutes to reach max)
+  return clamp(difficultyMs / 120000, 0, 1);
+}
+function currentGap(){
+  // היה: 270 -> 155
+  // עכשיו: קל הרבה יותר
+  return lerp(320, 220, difficultyT());
+}
+
+function currentSpeed(){
+  // היה: 5.0 -> 7.6
+  // עכשיו: איטי יותר
+  return lerp(4.3, 6.0, difficultyT());
+}
+
+function currentSpawnMs(){
+  // היה: 1550 -> 1050
+  // עכשיו: יותר זמן בין מכשולים
+  return lerp(1900, 1400, difficultyT());
+}
+function spawnObstacle(){
+  const gap = currentGap();
+  const w = 70;
+  const margin = 70;
+  const maxTop = canvas.height - gap - margin*2;
+  const topH = Math.floor(margin + Math.random() * Math.max(40, maxTop));
+
+  obstacles.push({ x: canvas.width + 50, w, topH, gap });
+}
+
+function drawObstacle(ob){
+  ctx.fillStyle = "#2bdc4a";
+  ctx.fillRect(ob.x, 0, ob.w, ob.topH);
+
+  const bottomY = ob.topH + ob.gap;
+  ctx.fillRect(ob.x, bottomY, ob.w, canvas.height - bottomY);
+
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(ob.x, 0, ob.w, ob.topH);
+  ctx.strokeRect(ob.x, bottomY, ob.w, canvas.height - bottomY);
+  ctx.lineWidth = 1;
+}
+
+function rectsOverlap(a,b){
+  return a.x < b.x + b.w &&
+         a.x + a.w > b.x &&
+         a.y < b.y + b.h &&
+         a.y + a.h > b.y;
+}
+
+// ======================
+// GAME STATE
+// ======================
+const cat = {
+  x: 220,
+  y: innerHeight/2,
+  speed: 7,
+  scale: 4
+};
+
+let running = false;
+let gameOver = false;
+let score = 0;
+let best = 0;
+
+function doGameOver(){
+  if(gameOver) return;
+  gameOver = true;
+  best = Math.max(best, Math.floor(score));
+
+  // stop music immediately
+  stopAllMusic();
+  musicMode = "none";
+
+  // play crash sound once
+  crash.pause();
+  crash.currentTime = 0;
+  crash.play().catch(()=>{});
+}
+
+function resetGame(){
+  obstacles = [];
+  spawnTimer = 0;
+  score = 0;
+  gameOver = false;
+  difficultyMs = 0;
+  cat.y = canvas.height/2;
+}
+
+function startGame(){
+  // If we were gameOver -> restart everything and restart music
+  if(gameOver){
+    resetGame();
+  }
+
+  // Start running + start music sequence (track1 -> track2 loop)
+  if(!running) running = true;
+
+  // Always restart music when starting (your rule for "start again")
+  // but only if not already playing
+  if(musicMode === "none"){
+    startMusicSequence();
+  }
+}
+
+addEventListener("mousedown", startGame);
+addEventListener("touchstart", startGame, {passive:true});
+addEventListener("keydown", e=>{
+  if(e.key === "Enter") startGame();
+});
+
+// ======================
+// LOOP
+// ======================
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(40, now - last);
+  last = now;
+
+  ctx.fillStyle = "#0b3d6e";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  drawStars();
+
+  const catW = 48*cat.scale;
+  const catH = 24*cat.scale;
+  const catRect = {x: cat.x, y: cat.y, w: catW, h: catH};
+
+  const introActive = (running && !gameOver && isIntroActive());
+
+  // During intro: no obstacles + no collision (as requested)
+  if(running && !gameOver && !introActive){
+    difficultyMs += dt;
+
+    const up = keys.has("ArrowUp") || keys.has("w");
+    const down = keys.has("ArrowDown") || keys.has("s");
+    if(up || tabletUp) cat.y -= cat.speed;
+if(down || tabletDown) cat.y += cat.speed;
+    if(touchDir === -1) cat.y -= cat.speed;
+    if(touchDir ===  1) cat.y += cat.speed;
+
+    if(cat.y < 20) cat.y = 20;
+    if(cat.y > canvas.height - catH - 20) cat.y = canvas.height - catH - 20;
+
+    spawnTimer += dt;
+    if(spawnTimer > currentSpawnMs()){
+      spawnTimer = 0;
+      spawnObstacle();
+    }
+
+    const speed = currentSpeed();
+    for(const ob of obstacles) ob.x -= speed;
+    obstacles = obstacles.filter(ob => ob.x + ob.w > -50);
+
+    for(const ob of obstacles){
+      const topR = {x: ob.x, y: 0, w: ob.w, h: ob.topH};
+      const bottomY = ob.topH + ob.gap;
+      const botR = {x: ob.x, y: bottomY, w: ob.w, h: canvas.height - bottomY};
+
+      if(rectsOverlap(catRect, topR) || rectsOverlap(catRect, botR)){
+        doGameOver();
+      }
+
+      if(!ob.passed && ob.x + ob.w < cat.x){
+        ob.passed = true;
+        score += 1;
+      }
+    }
+  }
+
+  for(const ob of obstacles) drawObstacle(ob);
+
+  drawRainbowTrail(cat.x, cat.y, catW, catH);
+  drawNyanCat(cat.x, cat.y, cat.scale);
+
+  // UI
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 26px Arial";
+  ctx.fillText(`Score: ${Math.floor(score)}`, 20, 40);
+  ctx.font = "bold 18px Arial";
+  ctx.fillText(`Best: ${best}`, 20, 68);
+
+  if(!running){
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 40px monospace";
+    ctx.fillText("CLICK / TAP / ENTER TO START", canvas.width/2 - 260, canvas.height/2);
+    ctx.font = "bold 22px monospace";
+    ctx.fillText("Use ⬆⬇ to move", canvas.width/2 - 110, canvas.height/2 + 45);
+  }
+
+  if(introActive){
+    drawRetroTitle();
+  }
+
+  if(gameOver){
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 48px monospace";
+    ctx.fillText("GAME OVER", canvas.width/2 - 140, canvas.height/2 - 20);
+    ctx.font = "bold 22px monospace";
+    ctx.fillText("Click / Tap / Enter to play again", canvas.width/2 - 190, canvas.height/2 + 30);
+  }
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+const btnUp = document.getElementById("btnUp");
+const btnDown = document.getElementById("btnDown");
+
+let tabletUp = false;
+let tabletDown = false;
+
+btnUp.addEventListener("touchstart", e=>{
+  e.preventDefault();
+  tabletUp = true;
+});
+btnUp.addEventListener("touchend", ()=>{
+  tabletUp = false;
+});
+
+btnDown.addEventListener("touchstart", e=>{
+  e.preventDefault();
+  tabletDown = true;
+});
+btnDown.addEventListener("touchend", ()=>{
+  tabletDown = false;
+});
+
+</script>
+</body>
+</html>
