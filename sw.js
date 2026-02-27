@@ -1,4 +1,4 @@
-const CACHE = "nyan-cat-v2";
+const CACHE = "nyan-cat-v3";
 const FILES = [
   "index.html",
   "manifest.json",
@@ -18,3 +18,4 @@ self.addEventListener("fetch", e => {
   );
 
 });
+
